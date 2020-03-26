@@ -1,0 +1,8 @@
+name = "JuliaIGA"
+uuid = "e9e30324-6a00-11ea-079c-ab2c592ca312"
+authors = ["Umberto Zerbinati <umberto.zerbinati02@universitadipavia.it>"]
+version = "0.0.1"
+
+[deps]
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+WebIO = "0f1e0344-ec1d-5b48-a673-e5cf874b6c29"
