@@ -1,7 +1,6 @@
 module JuliaIGA
 
 using Plots
-pyplot()
 
 include("CAD.jl");
 
