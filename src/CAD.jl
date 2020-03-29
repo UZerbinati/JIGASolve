@@ -52,6 +52,7 @@ function DeCasteljau(C,t)
 	elseif typeof(C) == BezierSurface
 		#C.B C.p righe C.q Colonne
 		B = reshape(C.B,C.p+1,3,C.q+1);
+		#println(B);
 		Q = [];
 		for j in 1:C.p+1	
 			V = [];
@@ -138,7 +139,7 @@ struct BSplineCurve
 end
 function BSplinePlot(C,h,Poly=true)
 	if typeof(C) == BSplineCurve
-		T = 0+h:h:maximum(C.K)-h;
+		T = 0:h:maximum(C.K);
 		BeY = [deBoor(C,t) for t in T]
 		I = [];
 		for i in C.K
@@ -148,7 +149,7 @@ function BSplinePlot(C,h,Poly=true)
 		end
 		plot(T,BeY,label="Curve")
 	elseif typeof(C) == BSplineCurve2D
-		T = 0+h:h:maximum(C.K)-h;
+		T = 0:h:maximum(C.K);
 		BeX = [deBoor(C,t)[1] for t in T]
 		BeY = [deBoor(C,t)[2] for t in T]
 		Vx = [C.V[i][1] for i in 1:length(C.V)]
@@ -158,7 +159,7 @@ function BSplinePlot(C,h,Poly=true)
 			scatter!(Vx,Vy,label="Control Points")
 		end
 	elseif typeof(C) == BSplineCurve3D
-		T = 0+h:h:maximum(C.K)-h;
+		T = 0:h:maximum(C.K);
 		BeX = [deBoor(C,t)[1] for t in T]
 		BeY = [deBoor(C,t)[2] for t in T]
 		BeZ = [deBoor(C,t)[3] for t in T]
@@ -169,32 +170,22 @@ function BSplinePlot(C,h,Poly=true)
 		if Poly
 			scatter!(Vx,Vy,Vz,label="Control Points")
 		end
-	elseif typeof(C) == BSplineSurface
-		x = 0:h:1
-		n = length(x);
-		X =  zeros(n,n)
-		Y =  zeros(n,n)
-		Z =  zeros(n,n)
-		for i in 1:n
-			for j in 1:n
-				X[i,j]=DeCasteljau(C,[x[i] x[j]])[1]
-				Y[i,j]=DeCasteljau(C,[x[i] x[j]])[2]
-				Z[i,j]=DeCasteljau(C,[x[i] x[j]])[3]
-			end
-		end
-		return(X,Y,Z)
 	end
 end
 function deBoor(C,t)
 	##print(t)
-	i = 0;
-	for l in 1:length(C.K)-1
-		if C.K[l]<=t<C.K[l+1]
-			i = l-1;
-		end
-	end
+
 	#print(" ",i);
 	if typeof(C) == BSplineCurve
+		i = 0;
+		for l in 1:length(C.K)-1
+			if C.K[l]<=t<C.K[l+1]
+				i = l-1;
+			end
+		end
+		if t == maximum(C.K)
+			return C.V[end]
+		end
 		n = length(C.V);
 		m = length(C.K);
 		if  m != n+C.p+1
@@ -208,6 +199,7 @@ function deBoor(C,t)
 			end
 			#print(" ",D);
 		end
+		return D[C.p+1];
 	elseif typeof(C) == BSplineCurve2D
 		X = [];
 		Y = [];
@@ -247,9 +239,25 @@ function deBoor(C,t)
 		Cz = BSplineCurve(C.p,Z,C.K);
 		Cw = BSplineCurve(C.p,W,C.K);
 		return [deBoor(Cx,t) deBoor(Cy,t) deBoor(Cz,t) deBoor(Cw,t)]
+	elseif typeof(C) == BSplineManifold
+		n = length(C.K)-C.p-1;
+		m = length(C.H)-C.q-1;
+		B = reshape(C.B,n,4,m);
+		Q = [];
+		for j in 1:n	
+			V = [];
+			for i in 1:m
+				#println(cat(B[j,:,i],dims=2))
+				push!(V,cat(B[j,:,i],dims=2))
+			end
+			#println(V)
+			X = BSplineCurve4D(C.q,V,C.K);
+			push!(Q,deBoor(X,t[2]));
+		end
+		#println(B[1,:,1])
+		Y = BSplineCurve4D(C.p,Q,C.H);
+		return deBoor(Y,t[1]);
 	end
-	#println(" ",D[C.p+1]);
-	return D[C.p+1];
 end
 
 #---------------
@@ -312,11 +320,88 @@ function HomoNURBS(C,t)
 		Cy = NURBSCurve(C.p,Y,C.ω,C.K);
 		Cz = NURBSCurve(C.p,Z,C.ω,C.K);
 		return [HomoNURBS(Cx,t) HomoNURBS(Cy,t) HomoNURBS(Cz,t)]
+	elseif typeof(C) == NURBSurface
+		n = length(C.K)-C.p-1;
+		m = length(C.H)-C.q-1;
+		#println(size(C.B))
+		B = reshape(C.B,n,3,m);
+		Q = zeros(n,4,m);
+		for i in 1:n
+			for j in 1:m
+				#println(B[i,:,j])
+				#println(cat(B[i,:,j],dims=2))
+				P = zeros(4,1);
+				P[1:3] = cat(B[i,:,j],dims=2)
+				P[4] = 1.0;
+				P = C.ω[i,j]*P;
+				#println(P)
+				Q[i,:,j]=P;
+			end
+		end	
+		BS = BSplineManifold(C.p,C.q,C.K,C.H,[[1 0] [0 0]; [0 0] [0 1]]);
+		BS.B = reshape(Q,9,4*9);
+		#println("P: ",reshape(Q,9,4,9)[1,:,1])
+		x = deBoor(BS,t);
+		if (x[end]==0)
+			return x[1:end-1]
+		else
+			return (1/x[end])*x[1:end-1]
+		end
+
 	end
 end
-function NURBSPlot(C,h,Poly=true)
+function NURBSEval(S,t)
+	if typeof(S) == NURBSurface
+		n = length(S.K)-S.p-1;
+		m = length(S.H)-S.q-1;
+		Q = zeros(n,m);
+		B = reshape(S.B,n,3,m);
+		for i in 1:n
+			for j in 1:m
+				V1 = []
+				for k in 1:length(S.K)-S.p-1
+					if k ==i
+						push!(V1,1.0)
+					else
+						push!(V1,0.0)
+					end
+				end
+				C1=BSplineCurve(S.p,V1,S.K);
+				V2 = []
+				for k in 1:length(S.H)-S.q-1
+					if k ==j
+						push!(V2,1.0)
+					else
+						push!(V2,0.0)
+					end
+				end
+				C2=BSplineCurve(S.q,V2,S.H);
+				Q[i,j] = deBoor(C1,t[1])*deBoor(C2,t[2]);
+			end
+		end
+		#println(Q);
+		Σ = zeros(3,1);
+		for i = 1:n
+			Z=zeros(3,1);
+			for j =1:m
+				D = 0;
+				for α = 1:n
+					T=0;
+					for β = 1:m
+						T = T+S.ω[α,β]*Q[α,β];
+					end
+					D = D+T;
+				end
+				Z = Z+(B[i,:,j]*Q[i,j]*S.ω[i,j])/D;
+			end
+			Σ = Σ+Z;
+		end
+		return Σ;
+	end
+end
+function NURBSPlot(C,h;Poly=true,opt="Projection")
 	if typeof(C) == NURBSCurve
-		T = 0+h:h:maximum(C.K)-h;
+		T = 0:h:maximum(C.K);
 		BeY = [HomoNURBS(C,t) for t in T]
 		I = [];
 		for i in C.K
@@ -326,7 +411,7 @@ function NURBSPlot(C,h,Poly=true)
 		end
 		plot(T,BeY,label="Curve")
 	elseif typeof(C) == NURBSCurve2D
-		T = 0+h:h:maximum(C.K)-h;
+		T = 0:h:maximum(C.K);
 		BeX = [HomoNURBS(C,t)[1] for t in T]
 		BeY = [HomoNURBS(C,t)[2] for t in T]
 		Vx = [C.V[i][1] for i in 1:length(C.V)]
@@ -336,7 +421,7 @@ function NURBSPlot(C,h,Poly=true)
 			scatter!(Vx,Vy,label="Control Points")
 		end
 	elseif typeof(C) == NURBSCurve3D
-		T = 0+h:h:maximum(C.K)-h;
+		T = 0:h:maximum(C.K);
 		BeX = [HomoNURBS(C,t)[1] for t in T]
 		BeY = [HomoNURBS(C,t)[2] for t in T]
 		BeZ = [HomoNURBS(C,t)[3] for t in T]
@@ -347,6 +432,27 @@ function NURBSPlot(C,h,Poly=true)
 		if Poly
 			scatter!(Vx,Vy,Vz,label="Control Points")
 		end
+	elseif typeof(C) == NURBSurface
+		x = 0:h:maximum(C.K);
+		y = 0:h:maximum(C.H);
+		n = length(x);
+		X =  zeros(n,n)
+		Y =  zeros(n,n)
+		Z =  zeros(n,n)
+		for i in 1:n
+			for j in 1:n
+				if opt=="Projection"
+					X[i,j]=HomoNURBS(C,[x[i] y[j]])[1]
+					Y[i,j]=HomoNURBS(C,[x[i] y[j]])[2]
+					Z[i,j]=HomoNURBS(C,[x[i] y[j]])[3]
+				elseif opt=="Direct"
+					X[i,j]=NURBSEval(C,[x[i] y[j]])[1]
+					Y[i,j]=NURBSEval(C,[x[i] y[j]])[2]
+					Z[i,j]=NURBSEval(C,[x[i] y[j]])[3]
+				end
+			end
+		end
+		return(X,Y,Z)
 	end
 end
 
@@ -359,10 +465,20 @@ struct BezierSurface
 	q::Int64
 	B::Array{Real,2}
 end
-struct BSplineSurface
+mutable struct BSplineManifold
 	p::Int64
 	q::Int64
+	K::Array{Real,1}
+	H::Array{Real,1}
 	B::Array{Real,2}
+end
+struct NURBSurface
+	p::Int64
+	q::Int64
+	K::Array{Real,1}
+	H::Array{Real,1}
+	B::Array{Real,2}
+	ω::Array{Real,2}
 end
 
 
