@@ -323,6 +323,7 @@ function HomoNURBS(C,t)
 	elseif typeof(C) == NURBSurface
 		n = length(C.K)-C.p-1;
 		m = length(C.H)-C.q-1;
+		#println("n: ",n,"m: ",m);
 		#println(size(C.B))
 		B = reshape(C.B,n,3,m);
 		Q = zeros(n,4,m);
@@ -339,7 +340,8 @@ function HomoNURBS(C,t)
 			end
 		end	
 		BS = BSplineManifold(C.p,C.q,C.K,C.H,[[1 0] [0 0]; [0 0] [0 1]]);
-		BS.B = reshape(Q,9,4*9);
+		#println("BS: ",size(Q));
+		BS.B = reshape(Q,n,4*m);
 		#println("P: ",reshape(Q,9,4,9)[1,:,1])
 		x = deBoor(BS,t);
 		if (x[end]==0)
