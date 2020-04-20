@@ -5,6 +5,21 @@ using Plots
 include("CAD.jl");
 
 greet() = print("Hello World, I'm JuliaIGA release 0.0.1")
+# BEZIER EXTRACTION
+function IEN(p,q)
+	M = zeros((p+1)^2,(q+1)^2);
+	for m in 0:p
+		for k in 0:p
+			σ=(k+m)*(p+q+1)+1;
+			for i in 0:p
+				for j in 0:p
+					M[k*(p+1)+1+j,m*(q+1)+1+i] = σ+i+j;
+				end
+			end
+		end
+	end
+	return M;
+end
 # EXAMPLES
 
 function BezierEx()
