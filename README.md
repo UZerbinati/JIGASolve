@@ -1,5 +1,5 @@
 # JIGASolve
-You can run Notebook example on Biner, if you run it on binder Interact will not work, [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/UZerbinati/JIGASolve/master?filepath=src%2FBinder.ipynb).
+You can run Notebook example on Biner, if you run it on binder Interact will not work, [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/UZerbinati/JIGASolve/24122b3cd8704e1006c334b3d48222dc6d1991f8?filepath=src%2FExamples%2FBinder.ipynb).
 
 ## TODO List
 

@@ -137,7 +137,7 @@ struct BSplineCurve
 	V::Array{Real,1}
 	K::Array{Real,1}
 end
-function BSplinePlot(C,h,Poly=true)
+function BSplinePlot(C,h,Poly=false)
 	if typeof(C) == BSplineCurve
 		T = 0:h:maximum(C.K);
 		BeY = [deBoor(C,t) for t in T]
