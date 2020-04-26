@@ -462,7 +462,7 @@ end
 # | SURFACES |
 #-------------
 
-struct BezierSurface
+mutable struct BezierSurface
 	p::Int64
 	q::Int64
 	B::Array{Real,2}
@@ -475,12 +475,34 @@ mutable struct BSplineManifold
 	B::Array{Real,2}
 end
 struct NURBSurface
-	p::Int64
-	q::Int64
-	K::Array{Real,1}
-	H::Array{Real,1}
-	B::Array{Real,2}
-	ω::Array{Real,2}
+	p::Int64 #Grado 1
+	q::Int64 #Grado 2
+	K::Array{Real,1} #Nodi 1
+	H::Array{Real,1} #Nodi 2
+	B::Array{Real,2} #Punti di Controllo
+	ω::Array{Real,2} #Pesi
 end
 
+#------------------
+#| CONTROL POINTS |
+#------------------
+
+function ControlPlot(C)
+	B = reshape(C.B,C.p+1,3,C.q+1);
+	X = [];
+	Y = [];
+	Z = [];
+	if typeof(C) == BezierSurface
+		for i in 1:C.p+1
+			for j in 1:C.q+1
+				P = cat(B[i,:,j],dims=2);
+				X = push!(X,P[1]);
+				Y = push!(Y,P[2]);
+				Z = push!(Z,P[3]);
+			end
+		end
+	end
+	scatter!(X,Y,Z);
+
+end
 

@@ -4,7 +4,9 @@ You can run Notebook example on Biner, if you run it on binder Interact will not
 ## TODO List
 
 - [ ] Implement Bezier elements method.
-	- [ ] Implement IEN and ID matrix
-	- [ ] Implement Bezier extraction operator
+	- [x] Implement IEN matrix
+	- [ ] Implement ID matrix
+	- [X] Implement Bezier extraction operator
+		- [ ] Extend to the non square case, i.e S.p not equal to S.q
 	- [ ] Implement Poisson problem in Galerkin formulation for Bezier elements. 
 - [ ] Implement Coeff. function and Symbolic Integrator.
