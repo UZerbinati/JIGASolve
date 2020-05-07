@@ -137,7 +137,7 @@ struct BSplineCurve
 	V::Array{Real,1}
 	K::Array{Real,1}
 end
-function BSplinePlot(C,h,Poly=false)
+function BSplinePlot(C,h,Poly=true)
 	if typeof(C) == BSplineCurve
 		T = 0:h:maximum(C.K);
 		BeY = [deBoor(C,t) for t in T]
@@ -197,7 +197,6 @@ function deBoor(C,t)
 				α = (t - C.K[j+i-C.p+1])/(C.K[j+1+i-r+1]-C.K[j+i-C.p+1]);
 				D[j+1] = (1.0-α)*D[j]+α*D[j+1];
 			end
-			#print(" ",D);
 		end
 		return D[C.p+1];
 	elseif typeof(C) == BSplineCurve2D
@@ -247,14 +246,11 @@ function deBoor(C,t)
 		for j in 1:n	
 			V = [];
 			for i in 1:m
-				#println(cat(B[j,:,i],dims=2))
 				push!(V,cat(B[j,:,i],dims=2))
 			end
-			#println(V)
 			X = BSplineCurve4D(C.q,V,C.K);
 			push!(Q,deBoor(X,t[2]));
 		end
-		#println(B[1,:,1])
 		Y = BSplineCurve4D(C.p,Q,C.H);
 		return deBoor(Y,t[1]);
 	end
@@ -289,7 +285,6 @@ function HomoNURBS(C,t)
 		for i in 1:length(C.V)
 			push!(V,[C.ω[i]*C.V[i] C.ω[i]]);
 		end
-		#print(V)
 		BS = BSplineCurve2D(C.p,V,C.K);
 		x = deBoor(BS,t);
 		if (x[end]==0)
@@ -323,26 +318,19 @@ function HomoNURBS(C,t)
 	elseif typeof(C) == NURBSurface
 		n = length(C.K)-C.p-1;
 		m = length(C.H)-C.q-1;
-		#println("n: ",n,"m: ",m);
-		#println(size(C.B))
 		B = reshape(C.B,n,3,m);
 		Q = zeros(n,4,m);
 		for i in 1:n
 			for j in 1:m
-				#println(B[i,:,j])
-				#println(cat(B[i,:,j],dims=2))
 				P = zeros(4,1);
 				P[1:3] = cat(B[i,:,j],dims=2)
 				P[4] = 1.0;
 				P = C.ω[i,j]*P;
-				#println(P)
 				Q[i,:,j]=P;
 			end
 		end	
 		BS = BSplineManifold(C.p,C.q,C.K,C.H,[[1 0] [0 0]; [0 0] [0 1]]);
-		#println("BS: ",size(Q));
 		BS.B = reshape(Q,n,4*m);
-		#println("P: ",reshape(Q,9,4,9)[1,:,1])
 		x = deBoor(BS,t);
 		if (x[end]==0)
 			return x[1:end-1]
@@ -381,7 +369,6 @@ function NURBSEval(S,t)
 				Q[i,j] = deBoor(C1,t[1])*deBoor(C2,t[2]);
 			end
 		end
-		#println(Q);
 		Σ = zeros(3,1);
 		for i = 1:n
 			Z=zeros(3,1);
@@ -482,7 +469,149 @@ struct NURBSurface
 	B::Array{Real,2} #Punti di Controllo
 	ω::Array{Real,2} #Pesi
 end
+#---------------------
+#| BEZIER EXTRACTION |
+#---------------------
 
+function IEN(p,q)
+	M = zeros((p+1)^2,(q+1)^2);
+	for m in 0:p
+		for k in 0:p
+			σ=(k+m)*(p+q+1)+1;
+			for i in 0:p
+				for j in 0:p
+					M[k*(p+1)+1+j,m*(q+1)+1+i] = σ+i+j;
+				end
+			end
+		end
+	end
+	return M;
+end
+function LocalExtractionOperators(ξ,p)
+	C = [];
+	#Inizializations
+	m = length(ξ) #Size of Knot Veector
+	a = p+1;
+	b = a+1;
+	nb = 1;
+	C = push!(C,Matrix{Float64}(I, a, a));
+	K = ξ[1:a];
+	while b < m
+		#Adding next extraction operation
+		C = push!(C,Matrix{Float64}(I, p+1, p+1));
+		i = b;
+		#Counting multiplicity of knot
+		K = push!(K,ξ[b]); #Filling new vector knot 
+		while b < m && ξ[b+1]==ξ[b]
+			K = push!(K,ξ[b+1])#Filling new vector knot
+			b=b+1
+		end
+		K = push!(K,ξ[b]); #Filling new vector knot
+		multiplicity = b-i+1;
+		if multiplicity < p
+			#Computing alpha for knot inserction
+			N = ξ[b]-ξ[a];
+			A = zeros(1,p+1);
+			for j in p:-1:multiplicity+1
+				A[j-multiplicity] = N / (ξ[a+j]-ξ[a]);	
+			end
+			r = p-multiplicity;
+			# Updating matrix coefficenets
+			for j in 1:r
+				save=r-j+1;
+				s=multiplicity+j;
+				for k in p+1:-1:s+1
+					α = A[k-s];
+					C[nb][:,k] = α*C[nb][:,k]+(1.0-α)*C[nb][:,k-1];
+				end
+				if b < m
+					#Updating overlaping coefficents
+					C[nb+1][save:j+save,save] = C[nb][p-j+1:p+1,p+1];
+				end
+			end
+			nb = nb+1;
+			if b<m
+				#Update Index a,b
+				a=b;
+				b=b+1;
+			end
+		end
+	end
+	return C[1:end-1],K[1:end-1];
+end
+function BezierExtraction(S)
+	n = length(S.K)-S.p-1;
+	m = length(S.H)-S.q-1;
+	B = reshape(S.B,n,3,m); #Reshape S.B to be accesed
+	#Creating local Bezier extraction operator
+	Cξ,K = LocalExtractionOperators(S.K,S.p); 
+	Cη,H = LocalExtractionOperators(S.H,S.q);
+	Q = [];
+	Qx = [];
+	Qy = [];
+	Qz = [];
+	T = [];
+	#Renumbering the control points (IMPROVABLE)
+	P = [];
+	for i in 1:n
+		for j in 1:m
+			P = push!(P,vcat(cat(B[i,:,j],dims=1),S.ω[i,j]));
+		end
+	end
+	if typeof(S) == NURBSurface
+		for i in 1:S.p+1
+			for j in 1:S.q+1
+				e = 3*(i-1)+j;
+				A = IEN(S.p,S.q); #Building the IEN elements
+				#Using the IEN matrix to build P
+				Pe = zeros((S.p+1)*(S.q+1),4);
+				for a in 1:(S.p+1)*(S.q+1)
+					k = A[a,e];
+					Pe[a,1] = P[Int(k)][1]
+					Pe[a,2] = P[Int(k)][2]
+					Pe[a,3] = P[Int(k)][3]
+					Pe[a,4] = P[Int(k)][4]
+				end
+				C = kron(Cη[i],Cξ[j]);
+				Wb = diagm(transpose(C)*Pe[:,4]);
+				W = diagm(Pe[:,4])
+				Qe = inv(Wb)*transpose(C)*W*Pe;
+				Q = push!(Q,Qe);
+				for l in 1:(S.p+1)*(S.q+1)
+					Qx=push!(Qx,Qe[l,1]);
+					Qy=push!(Qy,Qe[l,2]);
+					Qz=push!(Qz,Qe[l,3]);
+					T = push!(T,"("*string(e)*","*string(l)*")");
+				end
+			end
+		end
+	end
+	A =  IEN(S.p+1,S.q+1);
+	#Creating Bezier Control Points
+	BCP = zeros(S.p+S.q+3,3,S.p+S.q+3);
+	#Mapping Bezier local Bezier elements to global mesh
+	for e = 1:(S.p+1)*(S.q+1)
+		for l = 1:(S.p+1)*(S.q+1)
+			i = div(e,(S.p+1))*S.p+div(l,(S.p+1))+1;
+			if (e%(S.p+1))==0
+				i=i-S.p;
+			end
+			if (l%(S.p+1))==0
+				i=i-1;
+				j = ((e-1)%(S.p+1))*S.p+(S.p+1);
+			else
+				j = (l%(S.p+1))+((e-1)%(S.p+1))*S.p
+			end
+			BCP[i,:,j] = Q[e][l,1:3];
+		end
+	end
+	BCM = reshape(BCP,S.p+S.q+3,3*(S.p+S.q+3));#Converting in a format aceptable for Bezier Surface definition
+	
+	#Creating the Bezier Surface	
+	BS = BezierSurface((S.p+S.q+2),(S.p+S.q+2),[[1 0] [0 0]; [0 0] [0 1]]);
+	BS.B = BCM;
+	return BS;
+end
 #------------------
 #| CONTROL POINTS |
 #------------------
