@@ -112,7 +112,7 @@ function BezierPlot(C,h,Poly=true)
 		error("De Casteljau algorithm only work with Bezier curves");
 	end
 end
-
+PAT(x) = 0.5*(x+1);
 #-------------------
 #| BSPLINES CURVES |
 #-------------------
@@ -546,10 +546,14 @@ function BezierExtraction(S)
 	#Creating local Bezier extraction operator
 	Cξ,K = LocalExtractionOperators(S.K,S.p); 
 	Cη,H = LocalExtractionOperators(S.H,S.q);
+	#Inizialing Arrays
 	Q = [];
 	Qx = [];
 	Qy = [];
 	Qz = [];
+	CC = [];
+	WWb = [];
+	WW = [];
 	T = [];
 	#Renumbering the control points (IMPROVABLE)
 	P = [];
@@ -573,8 +577,11 @@ function BezierExtraction(S)
 					Pe[a,4] = P[Int(k)][4]
 				end
 				C = kron(Cη[i],Cξ[j]);
+				CC = push!(CC,C);
 				Wb = diagm(transpose(C)*Pe[:,4]);
+				WWb = push!(WWb,Wb);
 				W = diagm(Pe[:,4])
+				WW = push!(WW,W);
 				Qe = inv(Wb)*transpose(C)*W*Pe;
 				Q = push!(Q,Qe);
 				for l in 1:(S.p+1)*(S.q+1)
@@ -610,7 +617,7 @@ function BezierExtraction(S)
 	#Creating the Bezier Surface	
 	BS = BezierSurface((S.p+S.q+2),(S.p+S.q+2),[[1 0] [0 0]; [0 0] [0 1]]);
 	BS.B = BCM;
-	return BS;
+	return BS,CC,WWb,WW;
 end
 #------------------
 #| CONTROL POINTS |

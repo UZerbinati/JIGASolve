@@ -4,18 +4,35 @@ using Plots #Plotting library
 using LinearAlgebra
 
 include("CAD.jl");
-
+include("NM/BEF.jl");
 greet() = print("Hello World, I'm JuliaIGA release 0.0.1")
 # Variational Formulation
+BlaBla = true;
 
-struct VarFormulation
+mutable struct VariationalFormulation
 	a::String
 	trial::String
 	test::String
 	f::String
+	Ω
 	n::Int32
-end
 
+end
+function Assemble(VarForm)
+	#We switch among the different type of numerical methods.
+	Ω = VarForm.Ω;
+	println(typeof(Ω));
+	if isa(Ω,NURBSurface)	
+		BS, C = BezierExtraction(Ω);
+		Ndof = (BS.p*BS.q)
+		A = zeros(Ndof,Ndof);
+		@static if BlaBla 
+			println("Assembling Stifness Matrix Using Bezier FE");
+			println("Ndof: ",Ndof,", dim(Ω): ",VarForm.n);
+		end
+		return A;
+	end
+end
 # EXAMPLES
 
 function BezierEx()
