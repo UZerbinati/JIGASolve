@@ -442,12 +442,18 @@ function NURBSPlot(C,h;Poly=true,opt="Projection")
 					X[i,j]=NURBSEval(C,[x[i] y[j]])[1]
 					Y[i,j]=NURBSEval(C,[x[i] y[j]])[2]
 					Z[i,j]=NURBSEval(C,[x[i] y[j]])[3]
+				elseif opt=="Solution"
+					X[i,j]=x[i];
+					Y[i,j]=y[j];
+					Z[i,j]=HomoNURBS(C,[x[i] y[j]])[2]
 				end
+
 			end
 		end
 		return(X,Y,Z)
 	end
 end
+
 
 #-------------
 # | SURFACES |
